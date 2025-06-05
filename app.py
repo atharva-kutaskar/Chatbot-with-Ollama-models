@@ -1,55 +1,55 @@
 import streamlit as st
+import os
+from dotenv import load_dotenv
 
-from langchain_community.llms import Ollama
+from langchain_groq import ChatGroq
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
-import os
-
-from dotenv import load_dotenv
 load_dotenv()
 
-#LangSmith tracking
+groq_api_key_check = os.getenv("GROQ_API_KEY")
 
-os.environ["LANGCHAIN_API_KEY"]=os.getenv("LANGCHAIN_API_KEY")
-os.environ["LANGCHAIN_TRACING_V2"]="true"
-os.environ["LANGCHAIN_PROJECTS"]="Q&A Chatbot with Ollama"
+#LangSmith tracking 
+os.environ["LANGCHAIN_API_KEY"] = os.getenv("LANGCHAIN_API_KEY")
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+os.environ["LANGCHAIN_PROJECT"] = "Q&A Chatbot with Groq"
 
-##Prompt Template
-prompt=ChatPromptTemplate.from_messages(
-    [
-        ("system","You are a helpful assistant. Please respond to the user queries"),
-        ("user","Question:{question}")
-    ]
-)
 
-def generate_response(question,engine,temperature,max_tokens):
-    
-    llm=Ollama(model=engine)
-    output_parser=StrOutputParser()
-    chain=prompt|llm|output_parser
-    answer=chain.invoke({"question":question})
-    return answer
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful assistant. Please respond to the user queries."),
+    ("user", "Question: {question}")])
 
-##Title of app
-st.title("Enhanced Q&A Chatbot with Ollama")
+def generate_response(question, model_name, temperature, max_tokens):
+    llm = ChatGroq(
+            model=model_name,
+            groq_api_key=os.getenv("GROQ_API_KEY"),
+            temperature=temperature,
+            max_tokens=max_tokens)
+        
+    output_parser = StrOutputParser()
+    chain = prompt | llm | output_parser
+    response = chain.invoke({"question": question})
+    return response  
+        
+# Streamlit UI
+st.title("Q&A Chatbot for OS models from Ollama with Groq")
+st.sidebar.header("Settings")
 
-#Sidebar for settings
-st.sidebar.title("Settings")
+model_name = st.sidebar.selectbox("Select an OS Model", ["Gemma2-9b-It", "llama3-8b-8192"])
 
-#Dropdown- to select ollama models
-engine=st.sidebar.selectbox("Select an Ollama Model",["gemma:2b"])
+temperature = st.sidebar.slider("Temperature", min_value=0.0, max_value=1.0, value=0.7, help="Controls the randomness of the output. Lower values are more deterministic, higher values are more creative.")
+max_tokens = st.sidebar.slider("Max Tokens", min_value=50, max_value=300, value=150, help="The maximum number of tokens (words/pieces of words) in the generated response.")
 
-temperature=st.sidebar.slider("Temperature",min_value=0.0,max_value=1.0,value=0.7)
-max_tokens=st.sidebar.slider("Max Tokens",min_value=50,max_value=300,value=150)
 
-#Main interface for user input
-st.write("Go ahead and ask any questions")
-user_input=st.text_input("You:")
+st.write("Go ahead and ask any questions.")
+user_input = st.text_input("Your Question:", placeholder="Type your question here...")
 
-if user_input:
-    response=generate_response(user_input,engine,temperature,max_tokens)
+if user_input:    
+    with st.spinner("Thinking..."):
+        response = generate_response(user_input, model_name, temperature, max_tokens)
     st.write(response)
+
 else:
-    st.write("Please provide a query")
+    st.write("Please provide a query to get started!")
 
